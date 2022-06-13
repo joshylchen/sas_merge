@@ -15,7 +15,7 @@ def read(filename):
 
 setup(
     name="sas_merge",
-    version="0.1.0",
+    version="0.2.0",
     url="https://github.com/joshylchen/sas_merge",
     license='MIT',
 
