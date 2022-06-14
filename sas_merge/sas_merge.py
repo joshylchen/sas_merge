@@ -37,8 +37,8 @@ def SAS_merge(df1,df2,join_type,join_key):
     tablea_groupby = tablea.groupby(join_key).count().withColumnRenamed("count","tablea_count").withColumn("key_concat",concat(*join_key))
     tableb_groupby = tableb.groupby(join_key).count().withColumnRenamed("count","tableb_count").withColumn("key_concat",concat(*join_key))
     #take out the unique keys
-    tablea_groupby = tablea_groupby.filter(~col("key_concat").isin(df_exclustion)).drop("key_concat")
-    tableb_groupby = tableb_groupby.filter(~col("key_concat").isin(df_exclustion)).drop("key_concat")
+    tablea_groupby = tablea_groupby.filter(~col("key_concat").isin(set(df_exclustion))).drop("key_concat")
+    tableb_groupby = tableb_groupby.filter(~col("key_concat").isin(set(df_exclustion))).drop("key_concat")
     #find the max count
     df_table = tablea_groupby.join(tableb_groupby,join_key,"left").withColumn("max_count",_greatest(col("tablea_count"),col("tableb_count")))
 
@@ -103,10 +103,11 @@ def SAS_merge(df1,df2,join_type,join_key):
     tablea_uncommon_filled = tablea_uncom_gap.join(tablea_uncommon_row_desc,join_key,"left").select([col(x) for x in uncommon_tablea_columns_row])
     tableb_uncommon_filled = tableb_uncom_gap.join(tableb_uncommon_row_desc,join_key,"left").select([col(x) for x in uncommon_tableb_columns_row])
     #avoid ambiguous naming
+    #change_2 naming to _2_ to avoid _2 in column header and creating ambiuous naming again
     for val in uncommon_tablea_columns_only:
-        tablea_uncommon_filled = tablea_uncommon_filled.withColumnRenamed(val,(val+"_2"))
+        tablea_uncommon_filled = tablea_uncommon_filled.withColumnRenamed(val,(val+"_2_"))
     for val in uncommon_tableb_columns_only:
-        tableb_uncommon_filled = tableb_uncommon_filled.withColumnRenamed(val,(val+"_2"))
+        tableb_uncommon_filled = tableb_uncommon_filled.withColumnRenamed(val,(val+"_2_"))
     #avoid joining with empty dataset
     if tablea_uncommon_filled.rdd.isEmpty() == False:
         table_concat_2 = table_concat_2.join(tablea_uncommon_filled,[*join_key,"row"],"left").sort(*join_key,"idx")
@@ -117,11 +118,11 @@ def SAS_merge(df1,df2,join_type,join_key):
     #only merge when daaset is not empty
     if tablea_uncommon_filled.rdd.isEmpty() == False:
         for val in uncommon_tablea_columns_only:
-            table_concat_full = table_concat_full.withColumn(val,coalesce(col(val),col(val+"_2"))).drop(val+"_2")
+            table_concat_full = table_concat_full.withColumn(val,coalesce(col(val),col(val+"_2_"))).drop(val+"_2_")
 
     if tableb_uncommon_filled.rdd.isEmpty() == False:
         for val in uncommon_tableb_columns_only:
-            table_concat_full = table_concat_full.withColumn(val,coalesce(col(val),col(val+"_2"))).drop(val+"_2")
+            table_concat_full = table_concat_full.withColumn(val,coalesce(col(val),col(val+"_2_"))).drop(val+"_2_")
 
     table_uncommon_merge = table_concat_full.alias("table_uncommon_merge")
     ###tablea still maintain the right order so we don't need to join with idx to override.
@@ -131,7 +132,7 @@ def SAS_merge(df1,df2,join_type,join_key):
     tableb_common_override = df_tablea.join(tableb.select(common_columns),join_key,"inner").select(common_columns)
     #rename to avoid ambiguous column naming
     for val in common_columns_only:
-        tableb_common_override = tableb_common_override.withColumnRenamed(val,(val+"_2")).sort(*join_key,"idx")
+        tableb_common_override = tableb_common_override.withColumnRenamed(val,(val+"_2_")).sort(*join_key,"idx")
     #create row number for proper indexing
     comm_override_index = Window.partitionBy(join_key).orderBy(*join_key,"idx")
     tableb_common_override = tableb_common_override.withColumn("row",row_number().over(comm_override_index)).drop("idx")
@@ -143,7 +144,7 @@ def SAS_merge(df1,df2,join_type,join_key):
         table_shared_combined = table_override.drop("row","idx")
     else:
         for val in common_columns_only:      
-            table_shared_combined = table_override.withColumn(val,coalesce(col(val+"_2"),col(val))).drop(val+"_2")
+            table_shared_combined = table_override.withColumn(val,coalesce(col(val+"_2_"),col(val))).drop(val+"_2_")
         table_shared_combined = table_shared_combined.drop("row","idx")
 
     if df_exclude == None:
