@@ -144,8 +144,8 @@ def SAS_merge(df1,df2,join_type,join_key):
         table_shared_combined = table_override.drop("row","idx")
     else:
         for val in common_columns_only:      
-            table_shared_combined = table_override.withColumn(val,coalesce(col(val+"_2_"),col(val))).drop(val+"_2_")
-        table_shared_combined = table_shared_combined.drop("row","idx")
+            table_override = table_override.withColumn(val,coalesce(col(val+"_2_"),col(val))).drop(val+"_2_")
+        table_shared_combined = table_override.drop("row","idx")
 
     if df_exclude == None:
         #inner join, don't need to stack
